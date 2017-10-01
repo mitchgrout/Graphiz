@@ -42,13 +42,14 @@
             // 
             // panelRender
             // 
-            this.panelRender.BackColor = System.Drawing.SystemColors.AppWorkspace;
+            this.panelRender.BackColor = System.Drawing.SystemColors.ControlLight;
             this.panelRender.Location = new System.Drawing.Point(0, 25);
             this.panelRender.Name = "panelRender";
             this.panelRender.Size = new System.Drawing.Size(784, 536);
             this.panelRender.TabIndex = 0;
             this.panelRender.Paint += new System.Windows.Forms.PaintEventHandler(this.panelRender_Paint);
             this.panelRender.MouseDown += new System.Windows.Forms.MouseEventHandler(this.panelRender_MouseDown);
+            this.panelRender.MouseHover += new System.EventHandler(this.panelRender_MouseHover);
             this.panelRender.MouseMove += new System.Windows.Forms.MouseEventHandler(this.panelRender_MouseMove);
             this.panelRender.MouseUp += new System.Windows.Forms.MouseEventHandler(this.panelRender_MouseUp);
             // 
@@ -69,6 +70,7 @@
             // 
             // buttonPointer
             // 
+            this.buttonPointer.CheckOnClick = true;
             this.buttonPointer.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
             this.buttonPointer.Image = ((System.Drawing.Image)(resources.GetObject("buttonPointer.Image")));
             this.buttonPointer.ImageTransparentColor = System.Drawing.Color.Magenta;
@@ -79,6 +81,7 @@
             // 
             // buttonVertices
             // 
+            this.buttonVertices.CheckOnClick = true;
             this.buttonVertices.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
             this.buttonVertices.Image = ((System.Drawing.Image)(resources.GetObject("buttonVertices.Image")));
             this.buttonVertices.ImageTransparentColor = System.Drawing.Color.Magenta;
@@ -89,6 +92,7 @@
             // 
             // buttonEdges
             // 
+            this.buttonEdges.CheckOnClick = true;
             this.buttonEdges.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
             this.buttonEdges.Image = ((System.Drawing.Image)(resources.GetObject("buttonEdges.Image")));
             this.buttonEdges.ImageTransparentColor = System.Drawing.Color.Magenta;

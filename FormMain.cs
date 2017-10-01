@@ -80,18 +80,74 @@ namespace Graphiz
         /// </summary>
         private const int radius = 15;
 
+        /// <summary>
+        /// Spacing between minor gridlines
+        /// </summary>
+        private const int gridlineMinor = 50;
+        
+        /// <summary>
+        /// Spacing between major gridlines. Must be an integer multiple of gridlineMinor
+        /// </summary>
+        private const int gridlineMajor = 5 * gridlineMinor;
+
+        /// <summary>
+        /// Color used to render gridlines
+        /// </summary>
+        private Pen gridlineMinorColor = Pens.LightGray,
+                    gridlineMajorColor = Pens.Black,
+                    gridlineOrigin     = Pens.Blue;
+
+        /// <summary>
+        /// Define the origin of the window
+        /// </summary>
+        private Point ViewportPos;
+        
+        /// <summary>
+        /// Define the width / height of the window as a scale% of this.Size
+        /// </summary>
+        private uint ViewportDim;
+
         public FormMain()
         {
             InitializeComponent();
             // Sneakily enable double-buffering
             typeof(Panel).GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic)
                          .SetValue(this.panelRender, true);
-
+            
             // Ensure our default tool is the pointer
-            // this.buttonPointer.PerformClick();
+            this.buttonPointer.PerformClick();
+
+            this.ViewportPos = new Point(-this.Width/2, -this.Height/2);
+            this.ViewportDim = 100;
+
+            this.panelRender.MouseWheel += (o, e) =>
+                {
+                    if (e.Delta > 0) ViewportDim = Math.Max(10, ViewportDim - 10);
+                    if (e.Delta < 0) ViewportDim = Math.Min(1000, ViewportDim + 10);
+                    this.panelRender.Invalidate();
+                };
         }
 
         #region UTIL
+        /// <summary>
+        /// Take a point from the screen and map it to a graph point
+        /// </summary>
+        private Point ToWorldPos(Point p)
+        {
+            return new Point(this.ViewportPos.X + (int)(p.X * ViewportDim) / 100,
+                             this.ViewportPos.Y + (int)(p.Y * ViewportDim) / 100);
+        }
+
+        /// <summary>
+        /// Take a graph point and map it to the screen
+        /// </summary>
+        private Point FromWorldPos(Point p)
+        {
+            return new Point((int)((p.X - this.ViewportPos.X) * 100) / (int)ViewportDim,
+                             (int)((p.Y - this.ViewportPos.Y) * 100) / (int)ViewportDim);
+        }
+
+
         /// <summary>
         /// Find a vertex within r units of p
         /// </summary>
@@ -101,7 +157,9 @@ namespace Graphiz
         private Vertex NearestVertex(Point p, int r = radius)
         {
             return vertices.Values
-                           .FirstOrDefault(vertex => vertex.Location.Sub(p).NormSq() < r * r);
+                           .FirstOrDefault(vertex => vertex.Location
+                                                           .Sub(p)
+                                                           .NormSq() < r * r);
         }
         #endregion
 
@@ -123,12 +181,12 @@ namespace Graphiz
         private void setTool(object sender, State state)
         {
             toolState = state;
-            /*foreach (var cntl in this.toolStripMain.Items)
+            foreach (var cntl in this.toolStripMain.Items)
             {
                 var c = cntl as ToolStripButton;
                 if (c != null && c != sender && c.CheckOnClick)
                     c.Checked = false;
-            }*/
+            }
             (sender as ToolStripButton).Checked = true;
         }
 
@@ -175,25 +233,45 @@ namespace Graphiz
         private void panelRender_Paint(object sender, PaintEventArgs e)
         {
             var gfx = e.Graphics;
-            // using(var gfx = this.panelRender.CreateGraphics())
-            {
-                gfx.Clear(panelRender.BackColor);
 
-                edges.Select(edge => new Pair<Point, Point>(
-                                        vertices[edge.LeftID].Location,
-                                        vertices[edge.RightID].Location
-                                     ))
-                     .Each(pair => gfx.DrawLine(Pens.Red, pair.Left, pair.Right));
+            gfx.Clear(panelRender.BackColor);
 
-                foreach (var vertex in vertices.Values)
+            // Render gridlines (minor + major)
+            Point origin = ToWorldPos(Point.Empty),
+                  max    = ToWorldPos(new Point(this.Size));
+
+            Ext.Iota(origin.X - (origin.X % gridlineMinor), max.X, gridlineMinor)
+               .Each(x =>
                 {
-                    Brush vertexColor = Brushes.Green;
-                    if (grabVertex != null && vertex.ID == grabVertex.ID) vertexColor = Brushes.Blue;
-                    if (edgeVertex != null && vertex.ID == edgeVertex.ID) vertexColor = Brushes.Red;
-                    gfx.FillEllipse(vertexColor, vertex.Location.X - radius / 2, vertex.Location.Y - radius / 2, radius, radius);
-                    gfx.DrawString(vertex.Name, DefaultFont, Brushes.Black, vertex.Location);
-                }
+                    var p = FromWorldPos(new Point(x, 0));
+                    gfx.DrawLine(x == 0 ? gridlineOrigin : x % gridlineMajor == 0 ? gridlineMajorColor : gridlineMinorColor,
+                                 p.X, 0, p.X, this.Height);
+                });
+
+            Ext.Iota(origin.Y - (origin.Y % gridlineMinor), max.Y, gridlineMinor)
+               .Each(y =>
+                {
+                    var p = FromWorldPos(new Point(0, y));
+                    gfx.DrawLine(y == 0 ? gridlineOrigin : y % gridlineMajor == 0 ? gridlineMajorColor : gridlineMinorColor,
+                                 0, p.Y, this.Width, p.Y);
+                });
+
+            edges.Select(edge => new Pair<Point, Point>(
+                                    FromWorldPos(vertices[edge.LeftID].Location),
+                                    FromWorldPos(vertices[edge.RightID].Location)
+                                 ))
+                 .Each(pair => gfx.DrawLine(Pens.Red, pair.Left, pair.Right));
+
+            foreach (var vertex in vertices.Values)
+            {
+                Brush vertexColor = Brushes.Green;
+                if (grabVertex != null && vertex.ID == grabVertex.ID) vertexColor = Brushes.Blue;
+                if (edgeVertex != null && vertex.ID == edgeVertex.ID) vertexColor = Brushes.Red;
+                var pos = FromWorldPos(vertex.Location);
+                gfx.FillEllipse(vertexColor, pos.X - radius / 2, pos.Y - radius / 2, radius, radius);
+                gfx.DrawString(vertex.Name, DefaultFont, Brushes.Black, pos);
             }
+
         }
 
 
@@ -206,9 +284,10 @@ namespace Graphiz
             if (e.Button == MouseButtons.Left && toolState == State.Pointer)
             {
                 // Grab the nearest vertex
-                grabVertex = NearestVertex(e.Location);
+                grabVertex = NearestVertex(ToWorldPos(e.Location));
                 this.panelRender.Invalidate();
             }
+            
         }
 
         private void panelRender_MouseUp(object sender, MouseEventArgs e)
@@ -227,14 +306,14 @@ namespace Graphiz
 
                         // Add a vertex
                         case State.Vertices:
-                            var newVertex = new Vertex(e.Location);
+                            var newVertex = new Vertex(ToWorldPos(e.Location));
                             vertices.Add(newVertex.ID, newVertex);
                             this.panelRender.Invalidate();
                             break;
 
                         // Add an edge
                         case State.Edges:
-                            var selected = NearestVertex(e.Location);
+                            var selected = NearestVertex(ToWorldPos(e.Location));
                             if (selected != null)
                             {
                                 if (edgeVertex == null)
@@ -256,25 +335,47 @@ namespace Graphiz
                             break;
 
                     }
-
                     break;
 
                 // Right-click: tool independent
                 case MouseButtons.Right:
-                // TODO: Context menu
+                    // TODO: Context menu
+                    break;
 
                 default:
                     break;
             }
         }
 
+        private Point oldMouseLocation = Point.Empty;
         private void panelRender_MouseMove(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Left && grabVertex != null)
+            if (e.Button == MouseButtons.Left && toolState == State.Pointer)
             {
-                grabVertex.Location = e.Location;
-                this.panelRender.Invalidate();
+                // Move a vertex
+                if (grabVertex != null)
+                {
+                    var newLocation = ToWorldPos(e.Location);
+                    if (grabVertex.Location != newLocation)
+                    {
+                        grabVertex.Location = newLocation;
+                        this.panelRender.Invalidate();
+                    }
+                }
+                // Move the viewport
+                else
+                {
+                    int dx = e.X - oldMouseLocation.X,
+                        dy = e.Y - oldMouseLocation.Y;
+                    if (dx != 0 || dy != 0)
+                    {
+                        this.ViewportPos.X -= dx;
+                        this.ViewportPos.Y -= dy;
+                        this.panelRender.Invalidate();
+                    }
+                }
             }
+            oldMouseLocation = e.Location;
         }
 
         private void Form1_Resize(object sender, EventArgs e)
@@ -283,5 +384,10 @@ namespace Graphiz
             this.panelRender.Height = this.Height - 64;
         }
         #endregion EVENTS
+
+        private void panelRender_MouseHover(object sender, EventArgs e)
+        {
+            this.panelRender.Focus();
+        }
     }
 }

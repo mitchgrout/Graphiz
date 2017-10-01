@@ -32,9 +32,20 @@ namespace Graphiz
             return p.X * p.X + p.Y * p.Y;
         }
 
+        public static Point Add(this Point left, Point right)
+        {
+            return new Point(left.X + right.X, left.Y + right.Y);
+        }
+
         public static Point Sub(this Point left, Point right)
         {
             return new Point(left.X - right.X, left.Y - right.Y);
+        }
+
+        public static IEnumerable<int> Iota(this int start, int end, int step)
+        {
+            for (int x = start; x < end; x += step)
+                yield return x;
         }
 
         public static IEnumerable<Pair<A, B>> Product<A, B>(this IEnumerable<A> @as, IEnumerable<B> @bs)
