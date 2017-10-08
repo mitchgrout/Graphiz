@@ -13,68 +13,6 @@ namespace Graphiz
 {
     partial class FormMain : Form
     {
-        class Vertex
-        {
-            /// <summary>
-            /// Internal counter used to assign each vertex a unique ID
-            /// </summary>
-            protected static int nextID = 0;
-
-            /// <summary>
-            /// Unique ID assigned to each vertex
-            /// </summary>
-            public readonly int ID;
-
-            /// <summary>
-            /// Name to display
-            /// </summary>
-            public string Name;
-
-            /// <summary>
-            /// Position relative to the origin
-            /// </summary>
-            public Point Location;
-
-            public Vertex(Point Location)
-            {
-                this.ID = nextID++;
-                this.Name = this.ID.ToString();
-                this.Location = Location;
-            }
-
-            public Vertex(string Name, Point Location)
-            {
-                this.ID = nextID++;
-                this.Name = Name;
-                this.Location = Location;
-            }
-        }
-
-        class Edge
-        {
-            /// <summary>
-            /// The two IDs of the vertices incident with the edge
-            /// </summary>
-            public readonly int LeftID, RightID;
-
-            public Edge(int LeftID, int RightID)
-            {
-                this.LeftID = LeftID;
-                this.RightID = RightID;
-            }
-        }
-
-
-        /// <summary>
-        /// Maps Vertex.ID => Vertex; Vertex.ID is guaranteed to be unique
-        /// </summary>
-        private Dictionary<int, Vertex> vertices = new Dictionary<int, Vertex>();
-
-        /// <summary>
-        /// Collection of edges
-        /// </summary>
-        private HashSet<Edge> edges = new HashSet<Edge>();
-
         /// <summary>
         /// Radius of all vertices
         /// </summary>
@@ -98,14 +36,14 @@ namespace Graphiz
                     gridlineOrigin     = Pens.Blue;
 
         /// <summary>
-        /// Define the origin of the window
+        /// Current graph
         /// </summary>
-        private Point ViewportPos;
-        
+        private Graph Graph;
+
         /// <summary>
-        /// Define the width / height of the window as a scale% of this.Size
+        /// Viewport for the current graph
         /// </summary>
-        private uint ViewportDim;
+        private Viewport View;
 
         public FormMain()
         {
@@ -117,37 +55,18 @@ namespace Graphiz
             // Ensure our default tool is the pointer
             this.buttonPointer.PerformClick();
 
-            this.ViewportPos = new Point(-this.Width/2, -this.Height/2);
-            this.ViewportDim = 100;
+            this.Graph = new Graph();
+            this.View = new Viewport(-this.Width / 2, -this.Height / 2, 100);
 
             this.panelRender.MouseWheel += (o, e) =>
                 {
-                    if (e.Delta > 0) ViewportDim = Math.Max(10, ViewportDim - 10);
-                    if (e.Delta < 0) ViewportDim = Math.Min(1000, ViewportDim + 10);
+                    if (e.Delta > 0) this.View.Scale = Math.Max(10,   this.View.Scale - 10);
+                    if (e.Delta < 0) this.View.Scale = Math.Min(1000, this.View.Scale + 10);
                     this.panelRender.Invalidate();
                 };
         }
 
         #region UTIL
-        /// <summary>
-        /// Take a point from the screen and map it to a graph point
-        /// </summary>
-        private Point ToWorldPos(Point p)
-        {
-            return new Point(this.ViewportPos.X + (int)(p.X * ViewportDim) / 100,
-                             this.ViewportPos.Y + (int)(p.Y * ViewportDim) / 100);
-        }
-
-        /// <summary>
-        /// Take a graph point and map it to the screen
-        /// </summary>
-        private Point FromWorldPos(Point p)
-        {
-            return new Point((int)((p.X - this.ViewportPos.X) * 100) / (int)ViewportDim,
-                             (int)((p.Y - this.ViewportPos.Y) * 100) / (int)ViewportDim);
-        }
-
-
         /// <summary>
         /// Find a vertex within r units of p
         /// </summary>
@@ -156,10 +75,11 @@ namespace Graphiz
         /// </returns>
         private Vertex NearestVertex(Point p, int r = radius)
         {
-            return vertices.Values
-                           .FirstOrDefault(vertex => vertex.Location
-                                                           .Sub(p)
-                                                           .NormSq() < r * r);
+            return Graph.Vertices
+                        .Values
+                        .FirstOrDefault(vertex => vertex.Location
+                                                        .Sub(p)
+                                                        .NormSq() < r * r);
         }
         #endregion
 
@@ -209,21 +129,21 @@ namespace Graphiz
         #region FUNCS
         private void buttonClear_Click(object sender, EventArgs e)
         {
-            vertices.Clear();
-            edges.Clear();
+            Graph.Reset();
             this.panelRender.Invalidate();
         }
 
         private void buttonComplement_Click(object sender, EventArgs e)
         {
             var @new = new HashSet<Edge>();
-            vertices.Values
-                    .Product(vertices.Values)
-                    .Where(pair => pair.Left.ID != pair.Right.ID &&
-                                   edges.Count(edge => pair.Left.ID == edge.LeftID && pair.Right.ID == edge.RightID ||
-                                                       pair.Left.ID == edge.RightID && pair.Right.ID == edge.LeftID) == 0)
+            Graph.Vertices
+                 .Values
+                 .Product(Graph.Vertices.Values)
+                 .Where(pair => pair.Left.ID != pair.Right.ID &&
+                                Graph.Edges.Count(edge => pair.Left.ID == edge.LeftID && pair.Right.ID == edge.RightID ||
+                                                          pair.Left.ID == edge.RightID && pair.Right.ID == edge.LeftID) == 0)
                     .Each(pair => @new.Add(new Edge(pair.Left.ID, pair.Right.ID)));
-            edges = @new;
+            Graph.Edges = @new;
             this.panelRender.Invalidate();
         }
 
@@ -237,13 +157,13 @@ namespace Graphiz
             gfx.Clear(panelRender.BackColor);
 
             // Render gridlines (minor + major)
-            Point origin = ToWorldPos(Point.Empty),
-                  max    = ToWorldPos(new Point(this.Size));
+            Point origin = View.ToWorldPos(Point.Empty),
+                  max    = View.ToWorldPos(new Point(this.Size));
 
             Ext.Iota(origin.X - (origin.X % gridlineMinor), max.X, gridlineMinor)
                .Each(x =>
                 {
-                    var p = FromWorldPos(new Point(x, 0));
+                    var p = View.FromWorldPos(new Point(x, 0));
                     gfx.DrawLine(x == 0 ? gridlineOrigin : x % gridlineMajor == 0 ? gridlineMajorColor : gridlineMinorColor,
                                  p.X, 0, p.X, this.Height);
                 });
@@ -251,40 +171,36 @@ namespace Graphiz
             Ext.Iota(origin.Y - (origin.Y % gridlineMinor), max.Y, gridlineMinor)
                .Each(y =>
                 {
-                    var p = FromWorldPos(new Point(0, y));
+                    var p = View.FromWorldPos(new Point(0, y));
                     gfx.DrawLine(y == 0 ? gridlineOrigin : y % gridlineMajor == 0 ? gridlineMajorColor : gridlineMinorColor,
                                  0, p.Y, this.Width, p.Y);
                 });
 
-            edges.Select(edge => new Pair<Point, Point>(
-                                    FromWorldPos(vertices[edge.LeftID].Location),
-                                    FromWorldPos(vertices[edge.RightID].Location)
+            Graph.Edges
+                 .Select(edge => new Pair<Point, Point>(
+                                    View.FromWorldPos(Graph.Vertices[edge.LeftID].Location),
+                                    View.FromWorldPos(Graph.Vertices[edge.RightID].Location)
                                  ))
                  .Each(pair => gfx.DrawLine(Pens.Red, pair.Left, pair.Right));
 
-            foreach (var vertex in vertices.Values)
+            foreach (var vertex in Graph.Vertices.Values)
             {
                 Brush vertexColor = Brushes.Green;
-                if (grabVertex != null && vertex.ID == grabVertex.ID) vertexColor = Brushes.Blue;
-                if (edgeVertex != null && vertex.ID == edgeVertex.ID) vertexColor = Brushes.Red;
-                var pos = FromWorldPos(vertex.Location);
+                if (Graph.GrabVertex != null && vertex.ID == Graph.GrabVertex.ID) vertexColor = Brushes.Blue;
+                if (Graph.EdgeVertex != null && vertex.ID == Graph.EdgeVertex.ID) vertexColor = Brushes.Red;
+                var pos = View.FromWorldPos(vertex.Location);
                 gfx.FillEllipse(vertexColor, pos.X - radius / 2, pos.Y - radius / 2, radius, radius);
                 gfx.DrawString(vertex.Name, DefaultFont, Brushes.Black, pos);
             }
 
         }
 
-
-        // Used by various tools in mouse events to remember a vertex ID
-        private Vertex grabVertex = null,
-                       edgeVertex = null;
-
         private void panelRender_MouseDown(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left && toolState == State.Pointer)
             {
                 // Grab the nearest vertex
-                grabVertex = NearestVertex(ToWorldPos(e.Location));
+                Graph.GrabVertex = NearestVertex(View.ToWorldPos(e.Location));
                 this.panelRender.Invalidate();
             }
             
@@ -300,36 +216,36 @@ namespace Graphiz
                     {
                         // Release the grabbed vertex
                         case State.Pointer:
-                            grabVertex = null;
+                            Graph.GrabVertex = null;
                             this.panelRender.Invalidate();
                             break;
 
                         // Add a vertex
                         case State.Vertices:
-                            var newVertex = new Vertex(ToWorldPos(e.Location));
-                            vertices.Add(newVertex.ID, newVertex);
+                            var newVertex = new Vertex(View.ToWorldPos(e.Location));
+                            Graph.Vertices.Add(newVertex.ID, newVertex);
                             this.panelRender.Invalidate();
                             break;
 
                         // Add an edge
                         case State.Edges:
-                            var selected = NearestVertex(ToWorldPos(e.Location));
+                            var selected = NearestVertex(View.ToWorldPos(e.Location));
                             if (selected != null)
                             {
-                                if (edgeVertex == null)
+                                if (Graph.EdgeVertex == null)
                                 {
-                                    edgeVertex = selected;
+                                    Graph.EdgeVertex = selected;
                                     this.panelRender.Invalidate();
                                 }
                                 else
                                 {
-                                    if (edges.Count(edge => edge.LeftID == edgeVertex.ID && edge.RightID == selected.ID ||
-                                                            edge.LeftID == selected.ID && edge.RightID == edgeVertex.ID) == 0)
+                                    if (Graph.Edges.Count(edge => edge.LeftID == Graph.EdgeVertex.ID && edge.RightID == selected.ID ||
+                                                                  edge.LeftID == selected.ID && edge.RightID == Graph.EdgeVertex.ID) == 0)
                                     {
-                                        edges.Add(new Edge(edgeVertex.ID, selected.ID));
+                                        Graph.Edges.Add(new Edge(Graph.EdgeVertex.ID, selected.ID));
                                         this.panelRender.Invalidate();
                                     }
-                                    edgeVertex = null;
+                                    Graph.EdgeVertex = null;
                                 }
                             }
                             break;
@@ -353,12 +269,12 @@ namespace Graphiz
             if (e.Button == MouseButtons.Left && toolState == State.Pointer)
             {
                 // Move a vertex
-                if (grabVertex != null)
+                if (Graph.GrabVertex != null)
                 {
-                    var newLocation = ToWorldPos(e.Location);
-                    if (grabVertex.Location != newLocation)
+                    var newLocation = View.ToWorldPos(e.Location);
+                    if (Graph.GrabVertex.Location != newLocation)
                     {
-                        grabVertex.Location = newLocation;
+                        Graph.GrabVertex.Location = newLocation;
                         this.panelRender.Invalidate();
                     }
                 }
@@ -369,8 +285,8 @@ namespace Graphiz
                         dy = e.Y - oldMouseLocation.Y;
                     if (dx != 0 || dy != 0)
                     {
-                        this.ViewportPos.X -= dx;
-                        this.ViewportPos.Y -= dy;
+                        this.View.Origin.X -= dx;
+                        this.View.Origin.Y -= dy;
                         this.panelRender.Invalidate();
                     }
                 }
