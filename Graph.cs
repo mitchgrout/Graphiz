@@ -20,6 +20,11 @@ namespace Graphiz
         public HashSet<Edge> Edges = new HashSet<Edge>();
 
         /// <summary>
+        /// Array of colours used to paint vertices when they have been assigned a proper vertex colouring
+        /// </summary>
+        public Brush[] VertexColors = new Brush[] { Brushes.Green, Brushes.Black, Brushes.Red, Brushes.Blue, Brushes.Gray, Brushes.Yellow, Brushes.Aqua };
+
+        /// <summary>
         /// Graph manipulation state
         /// </summary>
         public Vertex GrabVertex,
@@ -72,6 +77,11 @@ namespace Graphiz
         /// </summary>
         public Point Location;
 
+        /// <summary>
+        /// Colour of a vertex; the colour to graphically paint it is given by Graph.VertexColors[Vertex.Color]
+        /// </summary>
+        public int Color;
+
         public Vertex(Point Location)
         {
             this.ID = nextID++;
@@ -90,14 +100,15 @@ namespace Graphiz
     class Edge
     {
         /// <summary>
-        /// The two IDs of the vertices incident with the edge
+        /// The two IDs of the vertices incident with the edge.
+        /// In all edges, LeftID <= RightID
         /// </summary>
         public readonly int LeftID, RightID;
 
         public Edge(int LeftID, int RightID)
         {
-            this.LeftID = LeftID;
-            this.RightID = RightID;
+            this.LeftID  = Math.Min(LeftID, RightID);
+            this.RightID = Math.Max(LeftID, RightID);
         }
     }
 }

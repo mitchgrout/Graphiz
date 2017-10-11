@@ -139,9 +139,8 @@ namespace Graphiz
             Graph.Vertices
                  .Values
                  .Product(Graph.Vertices.Values)
-                 .Where(pair => pair.Left.ID != pair.Right.ID &&
-                                Graph.Edges.Count(edge => pair.Left.ID == edge.LeftID && pair.Right.ID == edge.RightID ||
-                                                          pair.Left.ID == edge.RightID && pair.Right.ID == edge.LeftID) == 0)
+                 .Where(pair => pair.Left.ID < pair.Right.ID &&
+                                Graph.Edges.Count(edge => pair.Left.ID == edge.LeftID && pair.Right.ID == edge.RightID) == 0)
                     .Each(pair => @new.Add(new Edge(pair.Left.ID, pair.Right.ID)));
             Graph.Edges = @new;
             this.panelRender.Invalidate();
@@ -185,7 +184,7 @@ namespace Graphiz
 
             foreach (var vertex in Graph.Vertices.Values)
             {
-                Brush vertexColor = Brushes.Green;
+                Brush vertexColor = vertex.Color < this.Graph.VertexColors.Length? this.Graph.VertexColors[vertex.Color] : Brushes.White;
                 if (Graph.GrabVertex != null && vertex.ID == Graph.GrabVertex.ID) vertexColor = Brushes.Blue;
                 if (Graph.EdgeVertex != null && vertex.ID == Graph.EdgeVertex.ID) vertexColor = Brushes.Red;
                 var pos = View.FromWorldPos(vertex.Location);
@@ -304,6 +303,91 @@ namespace Graphiz
         private void panelRender_MouseHover(object sender, EventArgs e)
         {
             this.panelRender.Focus();
+        }
+
+        private void buttonColour_Click(object sender, EventArgs e)
+        {
+            int n = this.Graph.Vertices.Count;
+
+            // No vertices to colour
+            if (n == 0)
+                return;
+
+            // Simple case, no edges => 1-colourable
+            if (this.Graph.Edges.Count == 0)
+            {
+                this.Graph.Vertices.Values.Each(vertex => vertex.Color = 0);
+                this.panelRender.Invalidate();
+                return;
+            }
+
+            // Simple case, all edges => n-colourable
+            if (this.Graph.Edges.Count == (n * (n - 1)) / 2)
+            {
+                this.Graph.Vertices.Values
+                    .Zip(Ext.Iota(0, n, 1), (v, k) => new Pair<Vertex, int>(v, k))
+                    .Each(pair => pair.Left.Color = pair.Right);
+                this.panelRender.Invalidate();
+                return;
+            }
+
+            // Use a simple backtracking algorithm to try to paint our graph
+            // We *could* use some simple heuristics like finding odd/even cycles to reduce
+            // the cases, but that can be implemented later on
+            int[] vertexIDs = this.Graph.Vertices.Keys.ToArray();
+
+            // Reset colorings
+            this.Graph.Vertices.Values.Each(vertex => vertex.Color = -1);
+
+            // Initial choice for colour doesn't matter, so set it to the first colour we have
+            this.Graph.Vertices[vertexIDs[0]].Color = 0;
+
+            // State for backtracking
+            Stack<Queue<int>> state = new Stack<Queue<int>>();
+            // Minor offset
+            state.Push(null);
+
+            for(int k = 1; k < n; k++)
+            {
+                int vID = vertexIDs[k];
+                
+                // Is this our first run?
+                if(state.Count() == k)
+                {
+                    // Grab all our edge colours
+                    var edges = this.Graph.Edges
+                                    .Where(edge => edge.LeftID == vID || edge.RightID == vID)
+                                    .Select(edge => this.Graph.Vertices[edge.LeftID == vID ? edge.RightID : edge.LeftID].Color)
+                                    .Where(c => c >= 0)
+                                    .ToArray();
+
+                    // Figure out what colours we can use
+                    var choices = Ext.Iota(0, n, 1)
+                                     .Where(i => !edges.Contains(i));
+
+                    state.Push(new Queue<int>(choices));
+                }
+                
+                // Do we have any colours left?
+                if(state.Peek().Count() == 0)
+                {
+                    // Backtrack
+                    state.Pop();
+                    k -= 2;
+                    this.Graph.Vertices[vID].Color = -1;
+                    continue;
+                }
+
+                // Try the next colour
+                this.Graph.Vertices[vID].Color = state.Peek().Dequeue();
+            }
+
+            // Redraw
+            this.panelRender.Invalidate();
+
+            // Count the chromatic index
+            int χ = this.Graph.Vertices.Values.Max(vertex => vertex.Color) + 1;
+            MessageBox.Show("Coloured in " + χ + " colours");
         }
     }
 }

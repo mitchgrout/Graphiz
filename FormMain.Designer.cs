@@ -37,6 +37,7 @@
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.buttonClear = new System.Windows.Forms.ToolStripButton();
             this.buttonComplement = new System.Windows.Forms.ToolStripButton();
+            this.buttonColour = new System.Windows.Forms.ToolStripButton();
             this.toolStripMain.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -61,7 +62,8 @@
             this.buttonEdges,
             this.toolStripSeparator1,
             this.buttonClear,
-            this.buttonComplement});
+            this.buttonComplement,
+            this.buttonColour});
             this.toolStripMain.Location = new System.Drawing.Point(0, 0);
             this.toolStripMain.Name = "toolStripMain";
             this.toolStripMain.Size = new System.Drawing.Size(784, 25);
@@ -126,6 +128,16 @@
             this.buttonComplement.Text = "Complement";
             this.buttonComplement.Click += new System.EventHandler(this.buttonComplement_Click);
             // 
+            // buttonColour
+            // 
+            this.buttonColour.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.buttonColour.Image = ((System.Drawing.Image)(resources.GetObject("buttonColour.Image")));
+            this.buttonColour.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.buttonColour.Name = "buttonColour";
+            this.buttonColour.Size = new System.Drawing.Size(47, 22);
+            this.buttonColour.Text = "Colour";
+            this.buttonColour.Click += new System.EventHandler(this.buttonColour_Click);
+            // 
             // FormMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -153,6 +165,7 @@
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripButton buttonClear;
         private System.Windows.Forms.ToolStripButton buttonComplement;
+        private System.Windows.Forms.ToolStripButton buttonColour;
     }
 }
 
