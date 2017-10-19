@@ -61,5 +61,13 @@ namespace Graphiz
                              (int)((p.Y - this.Origin.Y) * 100) / (int)this.Scale);
         }
 
+        /// <summary>
+        /// Rescale a scalar
+        /// </summary>
+        /// <param name="i">
+        public int Rescale(int i)
+        {
+            return (i * 100) / Scale;
+        }
     }
 }

@@ -32,6 +32,7 @@
             this.panelRender = new System.Windows.Forms.Panel();
             this.toolStripMain = new System.Windows.Forms.ToolStrip();
             this.buttonPointer = new System.Windows.Forms.ToolStripButton();
+            this.buttonEraser = new System.Windows.Forms.ToolStripButton();
             this.buttonVertices = new System.Windows.Forms.ToolStripButton();
             this.buttonEdges = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
@@ -50,7 +51,6 @@
             this.panelRender.TabIndex = 0;
             this.panelRender.Paint += new System.Windows.Forms.PaintEventHandler(this.panelRender_Paint);
             this.panelRender.MouseDown += new System.Windows.Forms.MouseEventHandler(this.panelRender_MouseDown);
-            this.panelRender.MouseHover += new System.EventHandler(this.panelRender_MouseHover);
             this.panelRender.MouseMove += new System.Windows.Forms.MouseEventHandler(this.panelRender_MouseMove);
             this.panelRender.MouseUp += new System.Windows.Forms.MouseEventHandler(this.panelRender_MouseUp);
             // 
@@ -58,6 +58,7 @@
             // 
             this.toolStripMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.buttonPointer,
+            this.buttonEraser,
             this.buttonVertices,
             this.buttonEdges,
             this.toolStripSeparator1,
@@ -80,6 +81,16 @@
             this.buttonPointer.Size = new System.Drawing.Size(49, 22);
             this.buttonPointer.Text = "Pointer";
             this.buttonPointer.Click += new System.EventHandler(this.buttonPointer_Click);
+            // 
+            // buttonEraser
+            // 
+            this.buttonEraser.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.buttonEraser.Image = ((System.Drawing.Image)(resources.GetObject("buttonEraser.Image")));
+            this.buttonEraser.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.buttonEraser.Name = "buttonEraser";
+            this.buttonEraser.Size = new System.Drawing.Size(42, 22);
+            this.buttonEraser.Text = "Eraser";
+            this.buttonEraser.Click += new System.EventHandler(this.buttonEraser_Click);
             // 
             // buttonVertices
             // 
@@ -147,7 +158,7 @@
             this.Controls.Add(this.panelRender);
             this.Name = "FormMain";
             this.Text = "Graphiz";
-            this.Resize += new System.EventHandler(this.Form1_Resize);
+            this.Resize += new System.EventHandler(this.FormMain_Resize);
             this.toolStripMain.ResumeLayout(false);
             this.toolStripMain.PerformLayout();
             this.ResumeLayout(false);
@@ -166,6 +177,7 @@
         private System.Windows.Forms.ToolStripButton buttonClear;
         private System.Windows.Forms.ToolStripButton buttonComplement;
         private System.Windows.Forms.ToolStripButton buttonColour;
+        private System.Windows.Forms.ToolStripButton buttonEraser;
     }
 }
 

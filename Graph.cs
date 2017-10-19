@@ -20,38 +20,52 @@ namespace Graphiz
         public HashSet<Edge> Edges = new HashSet<Edge>();
 
         /// <summary>
-        /// Array of colours used to paint vertices when they have been assigned a proper vertex colouring
-        /// </summary>
-        public Brush[] VertexColors = new Brush[] { Brushes.Green, Brushes.Black, Brushes.Red, Brushes.Blue, Brushes.Gray, Brushes.Yellow, Brushes.Aqua };
-
-        /// <summary>
-        /// Graph manipulation state
-        /// </summary>
-        public Vertex GrabVertex,
-                      EdgeVertex;
-
-        /// <summary>
         /// Reset a graph object without explicitly calling new
         /// </summary>
         public void Reset()
         {
             this.Vertices.Clear();
             this.Edges.Clear();
-            this.GrabVertex = null;
-            this.EdgeVertex = null;
         }
 
-        public Vertex NearestVertex(Point p, int radius)
+        /// <summary>
+        /// Returns a vertex which is within radius world units of the given point.
+        /// Remembers the last returned result, which is returned so long as it is still
+        /// within radius world units of the given point.
+        /// </summary>
+        public Vertex NearestVertex(Point p, int r)
         {
-            return Vertices.Values
-                           .FirstOrDefault(vertex => vertex.Location
-                                                           .Sub(p)
-                                                           .NormSq() < radius * radius);
+            if(_oldVertex != null && closeToVertex(_oldVertex, p, r))
+                return _oldVertex;
+            else
+                return (_oldVertex = Vertices.Values.FirstOrDefault(vertex => closeToVertex(vertex, p, r)));
+        }
+        private Vertex _oldVertex;
+
+        /// <summary>
+        /// Returns an edge which is within radius world units of the given point.
+        /// Remembers the last returned result, which is returned so long as it is still
+        /// within radius world units of the given edge.
+        /// </summary>
+        public Edge NearestEdge(Point p, int r)
+        {
+            if (_oldEdge != null && closeToEdge(_oldEdge, p, r))
+                return _oldEdge;
+            else
+                return (_oldEdge = Edges.FirstOrDefault(edge => closeToEdge(edge, p, r)));
+        }
+        private Edge _oldEdge;
+
+        private bool closeToVertex(Vertex v, Point p, int r)
+        {
+            return v.Location.Sub(p).NormSq() < r * r;
         }
 
-        public Edge NearestEdge(Point p, int radius)
+        private bool closeToEdge(Edge e, Point p, int r)
         {
-            return null;
+            Point P1 = Vertices[e.LeftID].Location,
+                  P2 = Vertices[e.RightID].Location;
+            return Math.Abs((P2.Y - P1.Y) * p.X - (P2.X - P1.X) * p.Y + (P2.X * P1.Y) - (P2.Y * P1.X)) / P2.Sub(P1).Norm() < r;
         }
     }
 
