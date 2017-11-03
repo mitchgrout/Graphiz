@@ -7,7 +7,7 @@ using System.Drawing;
 
 namespace Graphiz
 {
-    class Graph
+    public class Graph
     {
         /// <summary>
         /// Maps Vertex.ID => Vertex; Vertex.ID is guaranteed to be unique
@@ -35,10 +35,8 @@ namespace Graphiz
         /// </summary>
         public Vertex NearestVertex(Point p, int r)
         {
-            if(_oldVertex != null && closeToVertex(_oldVertex, p, r))
-                return _oldVertex;
-            else
-                return (_oldVertex = Vertices.Values.FirstOrDefault(vertex => closeToVertex(vertex, p, r)));
+            if (_oldVertex != null && Vertices.ContainsKey(_oldVertex.ID) && closeToVertex(_oldVertex, p, r)) return _oldVertex;
+            else return (_oldVertex = Vertices.Values.FirstOrDefault(vertex => closeToVertex(vertex, p, r)));
         }
         private Vertex _oldVertex;
 
@@ -49,16 +47,14 @@ namespace Graphiz
         /// </summary>
         public Edge NearestEdge(Point p, int r)
         {
-            if (_oldEdge != null && closeToEdge(_oldEdge, p, r))
-                return _oldEdge;
-            else
-                return (_oldEdge = Edges.FirstOrDefault(edge => closeToEdge(edge, p, r)));
+            if (_oldEdge != null && Edges.Contains(_oldEdge) && closeToEdge(_oldEdge, p, r)) return _oldEdge;
+            else return (_oldEdge = Edges.FirstOrDefault(edge => closeToEdge(edge, p, r)));
         }
         private Edge _oldEdge;
 
         private bool closeToVertex(Vertex v, Point p, int r)
         {
-            return v.Location.Sub(p).NormSq() < r * r;
+            return v.Location.Sub(p).NormSquare() < r * r;
         }
 
         private bool closeToEdge(Edge e, Point p, int r)
@@ -69,7 +65,7 @@ namespace Graphiz
         }
     }
 
-    class Vertex
+    public class Vertex
     {
         /// <summary>
         /// Internal counter used to assign each vertex a unique ID
@@ -98,20 +94,46 @@ namespace Graphiz
 
         public Vertex(Point Location)
         {
-            this.ID = nextID++;
-            this.Name = this.ID.ToString();
+            this.ID       = nextID++;
+            this.Name     = this.ID.ToString();
             this.Location = Location;
+            this.Color    = 0;
         }
 
         public Vertex(string Name, Point Location)
         {
-            this.ID = nextID++;
-            this.Name = Name;
+            this.ID       = nextID++;
+            this.Name     = Name;
             this.Location = Location;
+            this.Color    = 0;
+        }
+
+        public static bool operator ==(Vertex lhs, Vertex rhs)
+        {
+            if (ReferenceEquals(lhs, rhs))  return true;
+            if (ReferenceEquals(lhs, null)) return false;
+            if (ReferenceEquals(rhs, null)) return false;
+            return lhs.ID == rhs.ID;
+        }
+
+        public static bool operator !=(Vertex lhs, Vertex rhs)
+        {
+            return !(lhs == rhs);
+        }        
+        
+        public override bool Equals(object obj)
+        {
+            if (obj is Vertex) return this == (Vertex) obj;
+            else               return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return ID;
         }
     }
 
-    class Edge
+    public class Edge
     {
         /// <summary>
         /// The two IDs of the vertices incident with the edge.
@@ -121,8 +143,33 @@ namespace Graphiz
 
         public Edge(int LeftID, int RightID)
         {
-            this.LeftID  = Math.Min(LeftID, RightID);
+            this.LeftID = Math.Min(LeftID, RightID);
             this.RightID = Math.Max(LeftID, RightID);
+        }
+
+        public static bool operator ==(Edge lhs, Edge rhs)
+        {
+            if (ReferenceEquals(lhs, rhs))  return true;
+            if (ReferenceEquals(lhs, null)) return false;
+            if (ReferenceEquals(rhs, null)) return false;
+            return lhs.LeftID == rhs.LeftID &&
+                   lhs.RightID == rhs.RightID;
+        }
+
+        public static bool operator !=(Edge lhs, Edge rhs)
+        {
+            return !(lhs == rhs);
+        }        
+        
+        public override bool Equals(object obj)
+        {
+            if (obj is Edge) return this == (Edge)obj;
+            else             return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return (LeftID << 8) ^ RightID;
         }
     }
 }

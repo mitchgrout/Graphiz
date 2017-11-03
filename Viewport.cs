@@ -27,14 +27,11 @@ namespace Graphiz
 
         public Viewport()
             : this(Point.Empty, 100)
-        {
-        }
+        { }
 
         public Viewport(int x, int y, int scale)
             : this(new Point(x, y), scale)
-        {
-            
-        }
+        { }
 
         public Viewport(Point origin, int scale)
         {

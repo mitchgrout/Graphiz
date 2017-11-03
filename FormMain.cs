@@ -13,54 +13,10 @@ namespace Graphiz
 {
     partial class FormMain : Form
     {
-        // TODO: Wrap up the below into a state object in preparation for serialization, etc
-
-        /// <summary>
-        /// Array of colours used to paint vertices when they have been assigned a proper vertex colouring
-        /// </summary>
-        public Brush[] VertexColors = new Brush[] { Brushes.Green, Brushes.Black, Brushes.Red, Brushes.Blue, Brushes.Gray, Brushes.Yellow, Brushes.Aqua };
-
-        /// <summary>
-        /// Colours used to paint vertices which are being interacted with
-        /// </summary>
-        public Brush VertexGrabColor = Brushes.Blue,
-                     VertexEdgeColor = Brushes.Red;
-
-        /// <summary>
-        /// Colour used to paint edges
-        /// </summary>
-        public Pen EdgeColor = Pens.Red;
-
-        /// <summary>
-        /// World size of a vertex at normal zoom. Vertex search radius is (Radius),
-        /// edge search radius is (Radius / 2)
-        /// </summary>
-        public int Radius = 15;
-
-        /// <summary>
-        /// Spacing between minor gridlines
-        /// </summary>
-        private const int GridlineMinor = 50;
-        
-        /// <summary>
-        /// Spacing between major gridlines. Must be an integer multiple of gridlineMinor
-        /// </summary>
-        private const int GridlineMajor = 5 * GridlineMinor;
-
-        /// <summary>
-        /// Color used to render gridlines
-        /// </summary>
-        private Pen GridlineMinorColor  = Pens.LightGray,
-                    GridlineMajorColor  = Pens.Black,
-                    GridlineOriginColor = Pens.Blue;
-        
-        // END TODO
-
-
         /// <summary>
         /// Current graph
         /// </summary>
-        private Graph Graph;
+        private Graph CurrentGraph;
 
         /// <summary>
         /// Viewport for the current graph
@@ -71,19 +27,18 @@ namespace Graphiz
         /// Vertex manipulation state
         /// </summary>
         private Vertex GrabVertex,
-                       EdgeVertex,
-                       EraseVertex;
+                       EdgeVertex;
 
         /// <summary>
         /// Edge manipulation state
         /// </summary>
-        private Edge EraseEdge;
+        // private Edge EraseEdge;
 
 
         public FormMain()
         {
             InitializeComponent();
-
+            
             // Sneakily enable double-buffering
             typeof(Panel).GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic)
                          .SetValue(this.panelRender, true);
@@ -91,10 +46,10 @@ namespace Graphiz
             // Ensure our default tool is the pointer
             this.buttonPointer.PerformClick();
 
-            this.Graph = new Graph();
+            this.CurrentGraph = new Graph();
             this.View = new Viewport(-this.panelRender.Width / 2, -this.panelRender.Height / 2, 100);
-
-            // Small 'hack' for mouse-wheel zoom (panels cannot gain focus from users, only via .Focus, .MouseWheel only procs when focused)
+            
+            // Small hack for mouse-wheel zoom (panels cannot gain focus from users, only via .Focus, and .MouseWheel only procs when focused)
             this.panelRender.MouseHover += (o, e) => this.panelRender.Focus();
             this.panelRender.MouseWheel += (o, e) =>
                 {
@@ -108,21 +63,21 @@ namespace Graphiz
         /// <summary>
         /// Represents the state of the tool-picker
         /// </summary>
-        private enum State
+        private enum GraphTool
         {
             Pointer,
             Eraser,
             Vertices,
             Edges
         }
-        private State toolState = State.Pointer;
+        private GraphTool SelectedTool = GraphTool.Pointer;
 
         /// <summary>
         /// Utility function for the tool-picker
         /// </summary>
-        private void setTool(object sender, State state)
+        private void SetTool(object sender, GraphTool tool)
         {
-            toolState = state;
+            SelectedTool = tool;
             foreach (var cntl in this.toolStripMain.Items)
             {
                 var c = cntl as ToolStripButton;
@@ -132,29 +87,30 @@ namespace Graphiz
             (sender as ToolStripButton).Checked = true;
         }
 
-        private void buttonPointer_Click(object sender, EventArgs e)  { setTool(sender, State.Pointer);  }
-        private void buttonEraser_Click(object sender, EventArgs e)   { setTool(sender, State.Eraser);   }
-        private void buttonVertices_Click(object sender, EventArgs e) { setTool(sender, State.Vertices); }
-        private void buttonEdges_Click(object sender, EventArgs e)    { setTool(sender, State.Edges);    }
+        private void buttonPointer_Click(object sender, EventArgs e)  { SetTool(sender, GraphTool.Pointer);  }
+        private void buttonEraser_Click(object sender, EventArgs e)   { SetTool(sender, GraphTool.Eraser);   }
+        private void buttonVertices_Click(object sender, EventArgs e) { SetTool(sender, GraphTool.Vertices); }
+        private void buttonEdges_Click(object sender, EventArgs e)    { SetTool(sender, GraphTool.Edges);    }
         #endregion TOOLS
 
         #region FUNCS
         private void buttonClear_Click(object sender, EventArgs e)
         {
-            Graph.Reset();
+            CurrentGraph.Reset();
             this.panelRender.Invalidate();
         }
 
         private void buttonComplement_Click(object sender, EventArgs e)
         {
             var @new = new HashSet<Edge>();
-            Graph.Vertices
+            CurrentGraph.Vertices
                  .Values
-                 .Product(Graph.Vertices.Values)
-                 .Where(pair => pair.Left.ID < pair.Right.ID &&
-                                Graph.Edges.Count(edge => pair.Left.ID == edge.LeftID && pair.Right.ID == edge.RightID) == 0)
-                    .Each(pair => @new.Add(new Edge(pair.Left.ID, pair.Right.ID)));
-            Graph.Edges = @new;
+                 .Product(CurrentGraph.Vertices.Values)
+                 .Where(pair => pair.Left.ID < pair.Right.ID)
+                 .Select(pair => new Edge(pair.Left.ID, pair.Right.ID))
+                 .Where(edge => !CurrentGraph.Edges.Contains(edge))
+                 .Each(edge => @new.Add(edge));
+            CurrentGraph.Edges = @new;
             this.panelRender.Invalidate();
         }
 
@@ -165,89 +121,94 @@ namespace Graphiz
             // Clearly bipartite so we expect χ(G) = 2, but this algorithm gives χ(G) = 3.
             // TODO: Fix
 
-            int n = this.Graph.Vertices.Count;
+            int n = this.CurrentGraph.Vertices.Count;
 
             // No vertices to colour
             if (n == 0)
                 return;
 
             // Simple case, no edges => 1-colourable
-            if (this.Graph.Edges.Count == 0)
+            else if (this.CurrentGraph.Edges.Count == 0)
             {
-                this.Graph.Vertices.Values.Each(vertex => vertex.Color = 0);
-                this.panelRender.Invalidate();
-                return;
+                this.CurrentGraph.Vertices.Values.Each(vertex => vertex.Color = 0);
             }
 
             // Simple case, all edges => n-colourable
-            if (this.Graph.Edges.Count == (n * (n - 1)) / 2)
+            else if (this.CurrentGraph.Edges.Count == (n * (n - 1)) / 2)
             {
-                this.Graph.Vertices.Values
+                this.CurrentGraph.Vertices.Values
                     .Zip(Ext.Iota(0, n, 1), (v, k) => new Pair<Vertex, int>(v, k))
                     .Each(pair => pair.Left.Color = pair.Right);
-                this.panelRender.Invalidate();
-                return;
             }
 
-            // Use a simple backtracking algorithm to try to paint our graph
-            // We *could* use some simple heuristics like finding odd/even cycles to reduce
-            // the cases, but that can be implemented later on
-            int[] vertexIDs = this.Graph.Vertices.Keys.ToArray();
-
-            // Reset colorings
-            this.Graph.Vertices.Values.Each(vertex => vertex.Color = -1);
-
-            // Initial choice for colour doesn't matter, so set it to the first colour we have
-            this.Graph.Vertices[vertexIDs[0]].Color = 0;
-
-            // State for backtracking
-            Stack<Queue<int>> state = new Stack<Queue<int>>();
-            // Minor offset
-            state.Push(null);
-
-            for (int k = 1; k < n; k++)
+            else
             {
-                int vID = vertexIDs[k];
+                // Use a simple backtracking algorithm to try to paint our graph
+                // We *could* use some simple heuristics like finding odd/even cycles to reduce
+                // the cases, but that can be implemented later on
+                int[] vertexIDs = this.CurrentGraph.Vertices.Keys.ToArray();
 
-                // Is this our first run?
-                if (state.Count() == k)
+                // Reset colorings
+                this.CurrentGraph.Vertices.Values.Each(vertex => vertex.Color = -1);
+
+                // Initial choice for colour doesn't matter, so set it to the first colour we have
+                this.CurrentGraph.Vertices[vertexIDs[0]].Color = 0;
+
+                // State for backtracking
+                Stack<Queue<int>> state = new Stack<Queue<int>>();
+                // Minor offset
+                state.Push(null);
+
+                for (int k = 1; k < n; k++)
                 {
-                    // Grab all our edge colours
-                    var edges = this.Graph.Edges
-                                    .Where(edge => edge.LeftID == vID || edge.RightID == vID)
-                                    .Select(edge => this.Graph.Vertices[edge.LeftID == vID ? edge.RightID : edge.LeftID].Color)
-                                    .Where(c => c >= 0)
-                                    .ToArray();
+                    int vID = vertexIDs[k];
 
-                    // Figure out what colours we can use
-                    var choices = Ext.Iota(0, n, 1)
-                                     .Where(i => !edges.Contains(i));
+                    // Is this our first run?
+                    if (state.Count() == k)
+                    {
+                        // Grab all our edge colours
+                        var edges = this.CurrentGraph.Edges
+                                        .Where(edge => edge.LeftID == vID || edge.RightID == vID)
+                                        .Select(edge => this.CurrentGraph.Vertices[edge.LeftID == vID ? edge.RightID : edge.LeftID].Color)
+                                        .Where(c => c >= 0)
+                                        .ToArray();
 
-                    state.Push(new Queue<int>(choices));
+                        // Figure out what colours we can use
+                        var choices = Ext.Iota(0, n, 1)
+                                         .Where(i => !edges.Contains(i));
+
+                        state.Push(new Queue<int>(choices));
+                    }
+
+                    // Do we have any colours left?
+                    if (state.Peek().Count() == 0)
+                    {
+                        // Backtrack
+                        state.Pop();
+                        k -= 2;
+                        this.CurrentGraph.Vertices[vID].Color = -1;
+                        continue;
+                    }
+
+                    // Try the next colour
+                    this.CurrentGraph.Vertices[vID].Color = state.Peek().Dequeue();
                 }
-
-                // Do we have any colours left?
-                if (state.Peek().Count() == 0)
-                {
-                    // Backtrack
-                    state.Pop();
-                    k -= 2;
-                    this.Graph.Vertices[vID].Color = -1;
-                    continue;
-                }
-
-                // Try the next colour
-                this.Graph.Vertices[vID].Color = state.Peek().Dequeue();
             }
-
 
             // Redraw
             this.panelRender.Invalidate();
 
             // Count the chromatic index; technically the number of colours we use, but since we use 
             // lowest colours first, χ(G) = (max colour) + 1
-            int χ = this.Graph.Vertices.Values.Max(vertex => vertex.Color) + 1;
+            int χ = this.CurrentGraph.Vertices.Values.Max(vertex => vertex.Color) + 1;
             MessageBox.Show("Coloured in " + χ + " colours");
+        }
+
+        private void buttonClassify_Click(object sender, EventArgs e)
+        {
+            // Spawn a new window which takes a reference to our graph.
+            // The reference is not stored
+            (new FormGraphInfo(CurrentGraph)).Show();
         }
         #endregion FUNCS
 
@@ -260,83 +221,80 @@ namespace Graphiz
             // Render gridlines (minor + major)
             Point origin = View.ToWorldPos(Point.Empty),
                   max    = View.ToWorldPos(new Point(this.Size));
+            Func<int, Pen> selector = k => k == 0 ? GlobalState.Instance.GridlineOriginColor : 
+                                           k % (GlobalState.GridlineMult * GlobalState.GridlineSpacing) == 0 ? GlobalState.Instance.GridlineMajorColor :
+                                           GlobalState.Instance.GridlineMinorColor;
 
-            Ext.Iota(origin.X - (origin.X % GridlineMinor), max.X, GridlineMinor)
-               .Each(x =>
-                {
-                    var p = View.FromWorldPos(new Point(x, 0));
-                    gfx.DrawLine(x == 0 ? GridlineOriginColor : x % GridlineMajor == 0 ? GridlineMajorColor : GridlineMinorColor,
-                                 p.X, 0, p.X, this.Height);
-                });
+            foreach (var x in Ext.Iota(origin.X - (origin.X % GlobalState.GridlineSpacing), max.X, GlobalState.GridlineSpacing))
+            {
+                var p = View.FromWorldPos(new Point(x, 0));
+                gfx.DrawLine(selector(x), p.X, 0, p.X, this.Height);
+            }
 
-            Ext.Iota(origin.Y - (origin.Y % GridlineMinor), max.Y, GridlineMinor)
-               .Each(y =>
-                {
-                    var p = View.FromWorldPos(new Point(0, y));
-                    gfx.DrawLine(y == 0 ? GridlineOriginColor : y % GridlineMajor == 0 ? GridlineMajorColor : GridlineMinorColor,
-                                 0, p.Y, this.Width, p.Y);
-                });
+            foreach(var y in Ext.Iota(origin.Y - (origin.Y % GlobalState.GridlineSpacing), max.Y, GlobalState.GridlineSpacing))
+            {
+                var p = View.FromWorldPos(new Point(0, y));
+                gfx.DrawLine(selector(y), 0, p.Y, this.Width, p.Y);
+            }
 
             // Render each edge
-            Graph.Edges
-                 .Select(edge => new Pair<Point, Point>(View.FromWorldPos(Graph.Vertices[edge.LeftID].Location),
-                                                        View.FromWorldPos(Graph.Vertices[edge.RightID].Location)))
-                 .Each(pair => gfx.DrawLine(EdgeColor, pair.Left, pair.Right));
-
-            foreach (var vertex in Graph.Vertices.Values)
+            foreach(var edge in CurrentGraph.Edges)
+                gfx.DrawLine(GlobalState.Instance.EdgeColor, View.FromWorldPos(CurrentGraph.Vertices[edge.LeftID].Location), 
+                                                             View.FromWorldPos(CurrentGraph.Vertices[edge.RightID].Location));
+                       
+            foreach (var vertex in CurrentGraph.Vertices.Values)
             {
                 // Choose the colour to use
-                Brush vertexColor = this.VertexColors[vertex.Color];
-                if (GrabVertex != null && vertex.ID == GrabVertex.ID) vertexColor = VertexGrabColor;
-                if (EdgeVertex != null && vertex.ID == EdgeVertex.ID) vertexColor = VertexEdgeColor;
+                Brush vertexColor = GlobalState.Instance.VertexColors[vertex.Color];
+                if (GrabVertex != null && vertex.ID == GrabVertex.ID) vertexColor = GlobalState.Instance.VertexGrabColor;
+                if (EdgeVertex != null && vertex.ID == EdgeVertex.ID) vertexColor = GlobalState.Instance.VertexEdgeColor;
                 
                 // Transform to real coordinates
                 var pos = View.FromWorldPos(vertex.Location);
-                int rad = View.Rescale(Radius);
+                int rad = View.Rescale(GlobalState.Instance.Radius);
 
                 // Draw the vertex itself
                 gfx.FillEllipse(vertexColor, pos.X - rad / 2, pos.Y - rad / 2, rad, rad);
                 
                 // Draw the name just below
                 var dims = gfx.MeasureString(vertex.Name, DefaultFont);
-                gfx.DrawString(vertex.Name, DefaultFont, Brushes.Black, pos.X - dims.Width / 2, pos.Y + View.Rescale(Radius));
+                gfx.DrawString(vertex.Name, DefaultFont, GlobalState.Instance.TextColor, pos.X - dims.Width / 2, pos.Y + rad);
             }
         }
 
         private void panelRender_MouseDown(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Left && toolState == State.Pointer)
+            if (e.Button == MouseButtons.Left && SelectedTool == GraphTool.Pointer)
             {
                 // Grab the nearest vertex
-                GrabVertex = this.Graph.NearestVertex(View.ToWorldPos(e.Location), Radius);
+                GrabVertex = this.CurrentGraph.NearestVertex(View.ToWorldPos(e.Location), GlobalState.Instance.Radius);
                 this.panelRender.Invalidate();
             }
-            
         }
 
         private void panelRender_MouseUp(object sender, MouseEventArgs e)
         {
-            Vertex selectedVertex = this.Graph.NearestVertex(View.ToWorldPos(e.Location), Radius);
-            Edge selectedEdge     = this.Graph.NearestEdge(View.ToWorldPos(e.Location), Radius / 2);
+            Vertex selectedVertex = this.CurrentGraph.NearestVertex(View.ToWorldPos(e.Location), GlobalState.Instance.Radius);
+            Edge selectedEdge = this.CurrentGraph.NearestEdge(View.ToWorldPos(e.Location), GlobalState.Instance.Radius / 2);
 
             switch (e.Button)
             {
                 // Left-click: tool dependent
                 case MouseButtons.Left:
-                    switch (toolState)
+                    switch (SelectedTool)
                     {
                         // Release the grabbed vertex
-                        case State.Pointer:
+                        case GraphTool.Pointer:
                             GrabVertex = null;
                             this.panelRender.Invalidate();
                             break;
 
-                        case State.Eraser:
+                        case GraphTool.Eraser:
                             if(selectedVertex != null)
                             {
                                 // Remove all associated edges
-                                this.Graph.Edges.RemoveWhere(edge => edge.LeftID == selectedVertex.ID || edge.RightID == selectedVertex.ID);
-                                this.Graph.Vertices.Remove(selectedVertex.ID);
+                                this.CurrentGraph.Edges.RemoveWhere(edge => edge.LeftID == selectedVertex.ID || edge.RightID == selectedVertex.ID);
+                                this.CurrentGraph.Vertices.Remove(selectedVertex.ID);
                                 // Unset selected vertices if we removed it
                                 if (this.GrabVertex == selectedVertex) this.GrabVertex = null;
                                 if (this.EdgeVertex == selectedVertex) this.EdgeVertex = null;
@@ -345,20 +303,20 @@ namespace Graphiz
                             else if(selectedEdge != null)
                             {
                                 // Remove only the relevant edge
-                                this.Graph.Edges.Remove(selectedEdge);
+                                this.CurrentGraph.Edges.Remove(selectedEdge);
                                 this.panelRender.Invalidate();
                             }
                             break;
 
                         // Add a vertex
-                        case State.Vertices:
+                        case GraphTool.Vertices:
                             var newVertex = new Vertex(View.ToWorldPos(e.Location));
-                            Graph.Vertices.Add(newVertex.ID, newVertex);
+                            CurrentGraph.Vertices.Add(newVertex.ID, newVertex);
                             this.panelRender.Invalidate();
                             break;
 
                         // Add an edge
-                        case State.Edges:
+                        case GraphTool.Edges:
                             if (selectedVertex != null)
                             {
                                 if (EdgeVertex == null)
@@ -368,10 +326,10 @@ namespace Graphiz
                                 }
                                 else
                                 {
-                                    if (Graph.Edges.Count(edge => edge.LeftID == EdgeVertex.ID && edge.RightID == selectedVertex.ID ||
+                                    if (CurrentGraph.Edges.Count(edge => edge.LeftID == EdgeVertex.ID && edge.RightID == selectedVertex.ID ||
                                                                   edge.LeftID == selectedVertex.ID && edge.RightID == EdgeVertex.ID) == 0)
                                     {
-                                        Graph.Edges.Add(new Edge(EdgeVertex.ID, selectedVertex.ID));
+                                        CurrentGraph.Edges.Add(new Edge(EdgeVertex.ID, selectedVertex.ID));
                                         this.panelRender.Invalidate();
                                     }
                                     EdgeVertex = null;
@@ -391,12 +349,12 @@ namespace Graphiz
             }
         }
 
-        private Point oldMouseLocation = Point.Empty;
+        private Point _oldMouseLocation = Point.Empty;
         private void panelRender_MouseMove(object sender, MouseEventArgs e)
         {
-            switch (toolState)
+            switch (SelectedTool)
             {
-                case State.Pointer:
+                case GraphTool.Pointer:
                     if (e.Button == MouseButtons.Left)
                     {
                         // Move a vertex
@@ -412,8 +370,8 @@ namespace Graphiz
                         // Move the viewport
                         else
                         {
-                            int dx = e.X - oldMouseLocation.X,
-                                dy = e.Y - oldMouseLocation.Y;
+                            int dx = e.X - _oldMouseLocation.X,
+                                dy = e.Y - _oldMouseLocation.Y;
                             if (dx != 0 || dy != 0)
                             {
                                 this.View.Origin.X -= dx;
@@ -424,7 +382,7 @@ namespace Graphiz
                     }
                     break;
             }
-            oldMouseLocation = e.Location;
+            _oldMouseLocation = e.Location;
         }
 
         private void FormMain_Resize(object sender, EventArgs e)
@@ -433,5 +391,6 @@ namespace Graphiz
             this.panelRender.Height = this.Height - 64;
         }
         #endregion EVENTS
+
     }
 }

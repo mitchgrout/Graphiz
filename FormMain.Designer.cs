@@ -39,6 +39,7 @@
             this.buttonClear = new System.Windows.Forms.ToolStripButton();
             this.buttonComplement = new System.Windows.Forms.ToolStripButton();
             this.buttonColour = new System.Windows.Forms.ToolStripButton();
+            this.buttonClassify = new System.Windows.Forms.ToolStripButton();
             this.toolStripMain.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -64,7 +65,8 @@
             this.toolStripSeparator1,
             this.buttonClear,
             this.buttonComplement,
-            this.buttonColour});
+            this.buttonColour,
+            this.buttonClassify});
             this.toolStripMain.Location = new System.Drawing.Point(0, 0);
             this.toolStripMain.Name = "toolStripMain";
             this.toolStripMain.Size = new System.Drawing.Size(784, 25);
@@ -84,6 +86,7 @@
             // 
             // buttonEraser
             // 
+            this.buttonEraser.CheckOnClick = true;
             this.buttonEraser.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
             this.buttonEraser.Image = ((System.Drawing.Image)(resources.GetObject("buttonEraser.Image")));
             this.buttonEraser.ImageTransparentColor = System.Drawing.Color.Magenta;
@@ -149,6 +152,16 @@
             this.buttonColour.Text = "Colour";
             this.buttonColour.Click += new System.EventHandler(this.buttonColour_Click);
             // 
+            // buttonClassify
+            // 
+            this.buttonClassify.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.buttonClassify.Image = ((System.Drawing.Image)(resources.GetObject("buttonClassify.Image")));
+            this.buttonClassify.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.buttonClassify.Name = "buttonClassify";
+            this.buttonClassify.Size = new System.Drawing.Size(51, 22);
+            this.buttonClassify.Text = "Classify";
+            this.buttonClassify.Click += new System.EventHandler(this.buttonClassify_Click);
+            // 
             // FormMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -178,6 +191,7 @@
         private System.Windows.Forms.ToolStripButton buttonComplement;
         private System.Windows.Forms.ToolStripButton buttonColour;
         private System.Windows.Forms.ToolStripButton buttonEraser;
+        private System.Windows.Forms.ToolStripButton buttonClassify;
     }
 }
 

@@ -18,20 +18,11 @@ namespace Graphiz
             this.Right = right;
         }
     }
-
-    // Ext methods
+    
+    // Extension methods
     static class Ext
     {
-        public static double Norm(this Point p)
-        {
-            return Math.Sqrt(p.NormSq());
-        }
-
-        public static int NormSq(this Point p)
-        {
-            return p.X * p.X + p.Y * p.Y;
-        }
-
+        #region System.Drawing.Point        
         public static Point Add(this Point left, Point right)
         {
             return new Point(left.X + right.X, left.Y + right.Y);
@@ -42,6 +33,18 @@ namespace Graphiz
             return new Point(left.X - right.X, left.Y - right.Y);
         }
 
+        public static double Norm(this Point p)
+        {
+            return Math.Sqrt(p.NormSquare());
+        }
+
+        public static int NormSquare(this Point p)
+        {
+            return p.X * p.X + p.Y * p.Y;
+        }
+        #endregion
+
+        #region System.Collections.Generic.IEnumerable
         public static IEnumerable<int> Iota(this int start, int end, int step)
         {
             for (int x = start; x < end; x += step)
@@ -60,5 +63,31 @@ namespace Graphiz
             foreach (T t in ts)
                 fn(t);
         }
+
+        public static IEnumerable<T> Intersperse<T>(this IEnumerable<T> ts, T val)
+        {
+            int count = ts.Count();
+            if (count == 0)
+                yield break;
+
+            foreach(var t in ts)
+            {
+                yield return t;
+                if (--count > 0) yield return val;
+            }
+        }
+
+        public static IEnumerable<T> Wrap<T>(this IEnumerable<T> ts, T start, T end)
+        {
+            yield return start;
+            foreach(var t in ts) yield return t;
+            yield return end;
+        }
+
+        public static string AsString(this IEnumerable<string> e)
+        {
+            return string.Join("", e);
+        }
+        #endregion
     }
 }
